@@ -33,8 +33,8 @@ async function prepareImage(m,token){
     const mime=blob.type==='image/png'?'image/png':'image/jpeg';
     preparedFile=new File([blob],m.name+'_BNI_명함.'+(mime==='image/png'?'png':'jpg'),{type:mime});
     $('shareBtn').disabled=false;
-    $('shareBtn').textContent='카톡·문자로 사진 공유';
-    setHelp('버튼을 누른 뒤 공유 목록에서 카카오톡 또는 메시지를 선택하세요. 링크나 설명 없이 명함 사진만 전달합니다.');
+    $('shareBtn').textContent='카카오톡 사진 공유';
+    setHelp('공유창이 열리면 카카오톡을 선택하세요. 지원하지 않는 브라우저에서는 사진을 저장해 갤러리에서 카카오톡으로 공유할 수 있습니다.');
   }catch(e){
     if(token!==prepareToken)return;
     $('shareBtn').disabled=true;
@@ -45,7 +45,7 @@ async function prepareImage(m,token){
 function share(){
   if(!current?.image||!preparedFile)return;
   if(typeof navigator.share!=='function'){
-    setHelp('현재 브라우저에는 사진 직접 공유 기능이 없습니다. 다운로드한 뒤 갤러리에서 사진을 선택하고 공유하세요.');
+    download();setHelp('휴대폰 브라우저에서 파일 공유를 지원하지 않아 명함 사진을 저장했습니다. 갤러리에서 사진을 열고 공유 → 카카오톡을 선택하세요.');
     return;
   }
   const payload={files:[preparedFile]};
@@ -53,18 +53,18 @@ function share(){
     // 일부 브라우저는 canShare()가 없어도 share()가 동작합니다.
     // canShare가 명확히 false를 반환한 경우에만 네이티브 파일 공유를 중단합니다.
     if(typeof navigator.canShare==='function' && !navigator.canShare(payload)){
-      setHelp('현재 브라우저에서는 사진 파일 직접 공유가 제한됩니다. 크롬으로 열거나 다운로드 후 갤러리에서 공유하세요.');
+      download();setHelp('휴대폰 브라우저에서 사진 직접 공유가 제한되어 명함 사진을 저장했습니다. 갤러리에서 공유 → 카카오톡을 선택하세요.');
       return;
     }
     // 파일만 공유하고 텍스트/URL을 넣지 않습니다. 클릭 이벤트 내에서 즉시 실행합니다.
     const promise=navigator.share(payload);
     Promise.resolve(promise).then(()=>{
-      setHelp('사진을 공유했습니다.');
+      setHelp('사진 공유 메뉴를 처리했습니다. 카카오톡을 선택해야 카톡으로 전송됩니다.');
     }).catch(e=>{
-      if(e?.name!=='AbortError')setHelp('사진 공유가 열리지 않았습니다. 크롬이나 삼성 인터넷에서 다시 시도하거나 다운로드 후 갤러리에서 공유하세요.');
+      if(e?.name!=='AbortError'){download();setHelp('공유창을 열 수 없어 사진을 저장했습니다. 갤러리에서 사진 선택 → 공유 → 카카오톡을 눌러주세요.');}
     });
   }catch(e){
-    setHelp('공유창을 열 수 없습니다. 다운로드 후 갤러리에서 공유하세요.');
+    download();setHelp('공유창이 열리지 않아 사진을 저장했습니다. 갤러리에서 공유 → 카카오톡을 선택하세요.');
   }
 }
 $('search').addEventListener('input',render);$('modalClose').onclick=close;$('closeBtn').onclick=close;$('downloadBtn').onclick=download;$('shareBtn').onclick=share;$('modal').addEventListener('click',e=>{if(e.target===$('modal'))close()});document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});render();try{let memberId=new URL(location.href).searchParams.get('member');if(memberId){let matching=members.find(m=>String(m.id)===memberId);if(matching)openModal(matching)}}catch{}})();
