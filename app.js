@@ -6,9 +6,9 @@
   else{$('modalImg').removeAttribute('src');$('modalImg').style.display='none';$('downloadBtn').disabled=true}
   $('modal').hidden=false;
   $('shareBtn').disabled=true;
-  $('shareBtn').textContent=m.image?'사진 저장·공유':'사진 미등록';
-  setHelp(m.image?'사진 저장·공유를 누른 다음, 휴대폰 공유 메뉴에서 카카오톡을 선택하세요.':'등록된 명함 사진이 없습니다.');
-  if(m.image)$('shareBtn').disabled=false;
+  $('shareBtn').textContent=m.image?'카카오톡 공유':'사진 미등록';
+  setHelp(m.image?'카카오톡을 선택해 사진만 전송합니다. 카카오톡 안에서 열린 브라우저는 사진 공유가 제한될 수 있습니다.':'등록된 명함 사진이 없습니다.');
+  if(m.image)prepareImage(m,token);
   document.body.style.overflow='hidden'
 }
 function close(){ ++prepareToken;preparedFile=null;$('modal').hidden=true;document.body.style.overflow='';current=null}function download(){if(!current?.image)return;let a=document.createElement('a');a.href=current.image;a.download=(current.name+'_프로필명함.jpg');document.body.append(a);a.click();a.remove()}function shareUrl(m){const u=new URL(window.location.href);u.searchParams.set('member',m.id);u.hash='';return u.href}
@@ -33,8 +33,8 @@ async function prepareImage(m,token){
     const mime=blob.type==='image/png'?'image/png':'image/jpeg';
     preparedFile=new File([blob],m.name+'_BNI_명함.'+(mime==='image/png'?'png':'jpg'),{type:mime});
     $('shareBtn').disabled=false;
-    $('shareBtn').textContent='사진 저장·공유';
-    setHelp('공유창이 열리면 카카오톡을 선택하세요. 지원하지 않는 브라우저에서는 사진을 저장해 갤러리에서 카카오톡으로 공유할 수 있습니다.');
+    $('shareBtn').textContent='카카오톡 공유';
+    setHelp('카카오톡 공유를 누르고 휴대폰 공유창에서 카카오톡을 선택하세요. 링크 없이 명함 사진만 공유합니다.');
   }catch(e){
     if(token!==prepareToken)return;
     $('shareBtn').disabled=true;
@@ -42,35 +42,28 @@ async function prepareImage(m,token){
     setHelp('이 브라우저에서는 명함 이미지 준비에 실패했습니다. 다운로드 후 갤러리에서 사진을 공유하세요.');
   }
 }
-async function share(){
+function share(){
   if(!current?.image)return;
-  const m=current,btn=$('shareBtn');
-  const normalLabel='사진 저장·공유';
-  btn.disabled=true;btn.textContent='준비 중…';
+  if(!preparedFile){
+    setHelp('명함 사진 준비 중입니다. 잠시 후 다시 눌러 주세요.');
+    return;
+  }
+  if(typeof navigator.share!=='function'){
+    setHelp('카카오톡 안의 브라우저에서는 사진 파일 공유를 지원하지 않습니다. 우측 다운로드로 사진을 저장한 뒤 갤러리에서 공유 → 카카오톡을 선택하거나, 크롬에서 이 페이지를 열어 주세요.');
+    return;
+  }
   try{
-    // 위너스 챕터와 동일한 방법: 원본 이미지를 Blob으로 읽어 File 객체로 전달
-    const response=await fetch(m.image);
-    if(!response.ok)throw new Error('사진을 불러오지 못했습니다');
-    const blob=await response.blob();
-    const file=new File([blob],m.name+'_프로필명함.'+(blob.type==='image/png'?'png':'jpg'),{type:blob.type||'image/jpeg'});
-    if(typeof navigator.share==='function'&&typeof navigator.canShare==='function'&&navigator.canShare({files:[file]})){
-      try{
-        await navigator.share({files:[file],title:m.name});
-        setHelp('공유 메뉴에서 카카오톡을 선택하면 받는 사람을 선택할 수 있습니다.');
-        return;
-      }catch(e){
-        if(e?.name==='AbortError')return;
-        setHelp('공유창 실행이 제한됐습니다. 저장된 사진을 갤러리에서 카카오톡으로 공유해 주세요.');
-      }
-    }else{
-      setHelp('현재 브라우저에서 사진 파일 직접 공유가 지원되지 않습니다. 다운로드한 사진을 갤러리에서 공유해 주세요.');
+    if(typeof navigator.canShare==='function' && !navigator.canShare({files:[preparedFile]})){
+      setHelp('현재 브라우저는 사진 파일 공유를 지원하지 않습니다. 우측 다운로드 후 갤러리에서 공유 → 카카오톡을 선택하거나 크롬에서 열어 주세요.');
+      return;
     }
-    // 미지원 브라우저에서는 사진만 저장 (링크 공유로 대체하지 않음)
-    download();
+    // 텍스트나 URL은 절대 보내지 않습니다. 공유 앱 선택은 운영체제가 담당합니다.
+    const operation=navigator.share({files:[preparedFile]});
+    Promise.resolve(operation).then(()=>setHelp('공유창에서 카카오톡을 선택해 받을 사람에게 사진을 보내세요.')).catch(e=>{
+      if(e?.name!=='AbortError')setHelp('이 브라우저에서 사진 공유창을 열지 못했습니다. 크롬에서 열거나 우측 다운로드 후 갤러리에서 카카오톡으로 공유해 주세요.');
+    });
   }catch(e){
-    setHelp('사진 공유에 실패했습니다. 다운로드 버튼으로 명함을 저장한 후 갤러리에서 공유해 주세요.');
-  }finally{
-    btn.disabled=false;btn.textContent=normalLabel;
+    setHelp('사진 공유창을 열 수 없습니다. 크롬에서 열거나 다운로드 후 갤러리에서 카카오톡으로 공유해 주세요.');
   }
 }
 $('search').addEventListener('input',render);$('modalClose').onclick=close;$('closeBtn').onclick=close;$('downloadBtn').onclick=download;$('shareBtn').onclick=share;$('modal').addEventListener('click',e=>{if(e.target===$('modal'))close()});document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});render();try{let memberId=new URL(location.href).searchParams.get('member');if(memberId){let matching=members.find(m=>String(m.id)===memberId);if(matching)openModal(matching)}}catch{}})();
