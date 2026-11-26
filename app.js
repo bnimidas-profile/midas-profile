@@ -44,14 +44,16 @@ async function prepareImage(m,token){
 }
 function share(){
   if(!current?.image||!preparedFile)return;
-  if(typeof navigator.share!=='function'||typeof navigator.canShare!=='function'){
-    setHelp('이 브라우저는 웹페이지에서 사진 파일 직접 공유를 지원하지 않습니다. 다운로드 후 갤러리의 공유 기능을 이용해 주세요.');
+  if(typeof navigator.share!=='function'){
+    setHelp('현재 브라우저에는 사진 직접 공유 기능이 없습니다. 다운로드한 뒤 갤러리에서 사진을 선택하고 공유하세요.');
     return;
   }
   const payload={files:[preparedFile]};
   try{
-    if(!navigator.canShare(payload)){
-      setHelp('이 브라우저에서는 명함 사진을 직접 공유할 수 없습니다. 다운로드 후 갤러리에서 공유하세요.');
+    // 일부 브라우저는 canShare()가 없어도 share()가 동작합니다.
+    // canShare가 명확히 false를 반환한 경우에만 네이티브 파일 공유를 중단합니다.
+    if(typeof navigator.canShare==='function' && !navigator.canShare(payload)){
+      setHelp('현재 브라우저에서는 사진 파일 직접 공유가 제한됩니다. 크롬으로 열거나 다운로드 후 갤러리에서 공유하세요.');
       return;
     }
     // 파일만 공유하고 텍스트/URL을 넣지 않습니다. 클릭 이벤트 내에서 즉시 실행합니다.
